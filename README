@@ -1,5 +1,5 @@
 This is a mirror of the Bash repository at https://git.savannah.gnu.org/git/bash.git.  
-Functionality has been added to the '~+' operator such that '~+text' will transform into $JUMP_text.
+Functionality has been added so that ',text' will transform into $JUMP_text. This is primarily meant to be used for quickly traversing complex file structures.
 
 Introduction
 ============
