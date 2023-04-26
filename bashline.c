@@ -313,7 +313,7 @@ static char *bash_completer_word_break_characters = " \t\n\"'@><=;|&(:";
 static char *bash_nohostname_word_break_characters = " \t\n\"'><=;|&(:";
 /* )) */
 
-static const char *default_filename_quote_characters = " \t\n\\\"'@<>=;|&()#$`?*[!:{~";	/*}*/
+static const char *default_filename_quote_characters = " \t\n\\\"'@<>=;|&()#$`?*[!:{~,";	/*}*/
 static char *custom_filename_quote_characters = 0;
 static char filename_bstab[256];
 
@@ -559,6 +559,7 @@ initialize_readline ()
 
   /* Have to jump through hoops here because there is a default binding for
      M-~ (rl_tilde_expand) */
+  // TODO: Figure out what this does
   kseq[0] = '~';
   kseq[1] = '\0';
   func = rl_function_of_keyseq (kseq, emacs_meta_keymap, (int *)NULL);
@@ -3137,7 +3138,7 @@ test_for_canon_directory (name)
   char *fn;
   int r;
 
-  fn = (*name == '~') ? bash_tilde_expand (name, 0) : savestring (name);
+  fn = (*name == ',' || *name == '~') ? bash_tilde_expand (name, 0) : savestring (name);
   bash_filename_stat_hook (&fn);
   r = file_isdir (fn);
   free (fn);
@@ -4143,7 +4144,7 @@ quote_word_break_chars (text)
       if (mbschr (rl_completer_word_break_characters, *s))
 	*r++ = '\\';
       /* XXX -- check for standalone tildes here and backslash-quote them */
-      if (s == text && *s == '~' && file_exists (text))
+      if (s == text && (*s == '~' || *s == ',') && file_exists (text))
         *r++ = '\\';
       *r++ = *s;
     }
@@ -4195,6 +4196,8 @@ bash_check_expchar (dirname, need_closer, nextp, closerp)
     }
   else if (dirname[0] == '~')
     ret = '~';
+  else if (dirname[0] == ',')
+    ret = ',';
   else
     {
       t = mbschr (dirname, '`');
@@ -4319,7 +4322,7 @@ bash_quote_filename (s, rtype, qcp)
   /* Don't tilde-expand backslash-quoted filenames, since only single and
      double quotes inhibit tilde expansion. */
   mtext = s;
-  if (mtext[0] == '~' && rtype == SINGLE_MATCH && cs != COMPLETE_BSQUOTE)
+  if ((mtext[0] == '~' || mtext[0] == ',') && rtype == SINGLE_MATCH && cs != COMPLETE_BSQUOTE)
     mtext = bash_tilde_expand (s, 0);
 
   switch (cs)

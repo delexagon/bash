@@ -86,7 +86,7 @@ extern char *sh_get_env_value (const char *);
    whitespace preceding a tilde so that simple programs which do not
    perform any word separation get desired behaviour. */
 static const char *default_prefixes[] =
-  { " ~", "\t~", (const char *)NULL };
+  { " ~", "\t~", " ,", "\t,", (const char *)NULL };
 
 /* The default value of tilde_additional_suffixes.  This is set to
    whitespace or newline so that simple programs which do not
@@ -135,7 +135,7 @@ tilde_find_prefix (const char *string, int *len)
   string_len = strlen (string);
   *len = 0;
 
-  if (*string == '\0' || *string == '~')
+  if (*string == '\0' || *string == '~' || *string == ',')
     return (0);
 
   if (prefixes)
@@ -192,10 +192,13 @@ tilde_expand (const char *string)
   int result_size, result_index;
 
   result_index = result_size = 0;
-  if (result = strchr (string, '~'))
+  if (result = strchr (string, '~')) {
     result = (char *)xmalloc (result_size = (strlen (string) + 16));
-  else
+  } else if (result = strchr (string, ',')) {
+    result = (char *)xmalloc (result_size = (strlen (string) + 16));
+  } else {
     result = (char *)xmalloc (result_size = (strlen (string) + 1));
+  }
 
   /* Scan through STRING expanding tildes as we come to them. */
   while (1)
@@ -225,34 +228,34 @@ tilde_expand (const char *string)
       if (!start && !end)
 	break;
 
-      /* Expand the entire tilde word, and copy it into RESULT. */
-      tilde_word = (char *)xmalloc (1 + end);
-      strncpy (tilde_word, string, end);
-      tilde_word[end] = '\0';
-      string += end;
+    /* Expand the entire tilde word, and copy it into RESULT. */
+    tilde_word = (char *)xmalloc (1 + end);
+    strncpy (tilde_word, string, end);
+    tilde_word[end] = '\0';
+    string += end;
 
-      expansion = tilde_expand_word (tilde_word);
+    expansion = tilde_expand_word (tilde_word);
 
-      if (expansion == 0)
-	expansion = tilde_word;
-      else
-	xfree (tilde_word);	
+    if (expansion == 0)
+      expansion = tilde_word;
+    else
+	    xfree (tilde_word);	
 
-      len = strlen (expansion);
+    len = strlen (expansion);
 #ifdef __CYGWIN__
       /* Fix for Cygwin to prevent ~user/xxx from expanding to //xxx when
 	 $HOME for `user' is /.  On cygwin, // denotes a network drive. */
-      if (len > 1 || *expansion != '/' || *string != '/')
+    if (len > 1 || *expansion != '/' || *string != '/')
 #endif
-	{
-	  if ((result_index + len + 1) > result_size)
-	    result = (char *)xrealloc (result, 1 + (result_size += (len + 20)));
+	  {
+	    if ((result_index + len + 1) > result_size)
+	      result = (char *)xrealloc (result, 1 + (result_size += (len + 20)));
 
-	  strcpy (result + result_index, expansion);
-	  result_index += len;
-	}
-      xfree (expansion);
-    }
+      strcpy (result + result_index, expansion);
+      result_index += len;
+	  }
+    xfree (expansion);
+  }
 
   result[result_index] = '\0';
 
@@ -342,8 +345,43 @@ tilde_expand_word (const char *filename)
   if (filename == 0)
     return ((char *)NULL);
 
-  if (*filename != '~')
+  if (*filename != '~' && *filename != ',') {
     return (savestring (filename));
+  }
+  
+  if (filename[0] == ',') {
+    if (filename[1] == '\0' || filename[1] == '/') {
+      return (savestring (filename));
+    }
+    username = isolate_tilde_prefix (filename, &user_len);
+    char jump_fixed[32];
+    char* jump_var;
+    int usrlen = strlen(username);
+    char* jump = "JUMP_";
+    int jumplen = 5;
+    char malloc_flag = 0;
+    
+    // Prevent spending time mallocing unless we have to.
+    if(jumplen+usrlen+1 > 32) {
+      jump_var = (char *)xmalloc (jumplen + usrlen + 1);
+      malloc_flag = 1;
+    } else {
+      jump_var = jump_fixed;
+    }
+    strcpy(jump_var, jump);
+    strcpy(jump_var+jumplen, username);
+    jump_var[jumplen+usrlen] = 0;
+    
+    expansion = sh_get_env_value(jump_var);
+    if(malloc_flag) {
+      xfree(jump_var);
+    }
+    xfree(username);
+    if(expansion == 0) {
+      return (savestring (filename));
+    }
+    return (glue_prefix_and_suffix (expansion, filename, usrlen+1));
+  }
 
   /* A leading `~/' or a bare `~' is *always* translated to the value of
      $HOME or the home directory of the current user, regardless of any
@@ -372,33 +410,6 @@ tilde_expand_word (const char *filename)
 	    xfree (expansion);
 	    return (dirname);
 	  }
-  }
-  
-  if(username[0] == '+') {
-    char jump_fixed[32];
-    char* jump_var;
-    int usrlen = strlen(username)-1;
-    char* jump = "JUMP_";
-    int jumplen = 5;
-    char malloc_flag = 0;
-    
-    // Prevent spending time mallocing unless we have to.
-    if(jumplen+usrlen+1 > 32) {
-      jump_var = (char *)xmalloc (jumplen + usrlen + 1);
-      malloc_flag = 1;
-    } else {
-      jump_var = jump_fixed;
-    }
-    strcpy(jump_var, jump);
-    strcpy(jump_var+jumplen, username+1);
-    jump_var[jumplen+usrlen] = 0;
-    
-    expansion = sh_get_env_value(jump_var);
-    if(malloc_flag) {
-      xfree(jump_var);
-    }
-    xfree(username);
-    return (glue_prefix_and_suffix (expansion, filename, usrlen+2));
   }
 
   /* No preexpansion hook, or the preexpansion hook failed.  Look in the

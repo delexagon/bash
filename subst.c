@@ -3814,14 +3814,14 @@ pos_params (string, start, end, quoted, pflags)
 /******************************************************************/
 
 #if defined (PROCESS_SUBSTITUTION)
-#define EXP_CHAR(s) (s == '$' || s == '`' || s == '<' || s == '>' || s == CTLESC || s == '~')
+#define EXP_CHAR(s) (s == '$' || s == '`' || s == '<' || s == '>' || s == CTLESC || s == '~' || s == ',')
 #else
-#define EXP_CHAR(s) (s == '$' || s == '`' || s == CTLESC || s == '~')
+#define EXP_CHAR(s) (s == '$' || s == '`' || s == CTLESC || s == '~' || s == ',')
 #endif
 
 /* We don't perform process substitution in arithmetic expressions, so don't
    bother checking for it. */
-#define ARITH_EXP_CHAR(s) (s == '$' || s == '`' || s == CTLESC || s == '~')
+#define ARITH_EXP_CHAR(s) (s == '$' || s == '`' || s == CTLESC || s == '~' || s == ',')
 
 /* If there are any characters in STRING that require full expansion,
    then call FUNC to expand STRING; otherwise just perform quote
@@ -10847,7 +10847,7 @@ expand_array_subscript (string, sindex, quoted, flags)
 	 the characters that delimit subscripts. */
       memset (abstab, '\0', sizeof (abstab));
       abstab[LBRACK] = abstab[RBRACK] = 1;
-      abstab['$'] = abstab['`'] = abstab['~'] = 1;
+      abstab['$'] = abstab['`'] = abstab['~'] = abstab[','] = 1;
       abstab['\\'] = abstab['\''] = 1;
       abstab['"'] = 1;	/* XXX */
       /* We don't quote `@' or `*' in the subscript at all. */
@@ -11138,7 +11138,7 @@ add_string:
 	      (posixly_correct == 0 || (word->flags & W_TILDEEXP)) &&
 	      assignoff == -1 && sindex > 0)
 	    assignoff = sindex;
-	  if (sindex == assignoff && string[sindex+1] == '~')	/* XXX */
+	  if (sindex == assignoff && (string[sindex+1] == '~' || string[sindex+1] == ','))	/* XXX */
 	    internal_tilde = 1;
 
 	  if (word->flags & W_ASSIGNARG)
@@ -11163,7 +11163,7 @@ add_string:
 
 	  if ((word->flags & (W_ASSIGNMENT|W_ASSIGNRHS)) &&
 	      (posixly_correct == 0 || (word->flags & W_TILDEEXP)) &&
-	      string[sindex+1] == '~')
+	      (string[sindex+1] == ',' || string[sindex+1] == '~'))
 	    internal_tilde = 1;
 
 	  if (isexp == 0 && (word->flags & (W_NOSPLIT|W_NOSPLIT2)) == 0 && isifs (c))
@@ -11171,7 +11171,7 @@ add_string:
 	  else
 	    goto add_character;
 
-	case '~':
+	case ',': case '~':
 	  /* If the word isn't supposed to be tilde expanded, or we're not
 	     at the start of a word or after an unquoted : or = in an
 	     assignment statement, we don't do tilde expansion.  We don't
@@ -11202,7 +11202,7 @@ add_string:
 	  if (temp && *temp && t_index > 0)
 	    {
 	      temp1 = bash_tilde_expand (temp, tflag);
-	      if  (temp1 && *temp1 == '~' && STREQ (temp, temp1))
+	      if  (temp1 && (*temp1 == '~' || *temp1 == ',') && STREQ (temp, temp1))
 		{
 		  FREE (temp);
 		  FREE (temp1);

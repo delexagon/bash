@@ -2311,7 +2311,7 @@ rl_username_completion_function (const char *text, int state)
 
       strcpy (value + first_char_loc, entry->pw_name);
 
-      if (first_char == '~')
+      if (first_char == ',' || first_char == '~')
 	rl_filename_completion_desired = 1;
 
       return (value);
@@ -2521,7 +2521,7 @@ rl_filename_completion_function (const char *text, int state)
 	users_dirname = savestring (dirname);
 
       tilde_dirname = 0;
-      if (*dirname == '~')
+      if (*dirname == ',' || *dirname == '~')
 	{
 	  temp = tilde_expand (dirname);
 	  xfree (dirname);
@@ -2636,7 +2636,7 @@ rl_filename_completion_function (const char *text, int state)
       /* dirname && (strcmp (dirname, ".") != 0) */
       if (dirname && (dirname[0] != '.' || dirname[1]))
 	{
-	  if (rl_complete_with_tilde_expansion && *users_dirname == '~')
+	  if (rl_complete_with_tilde_expansion && (*users_dirname == ',' || *users_dirname == '~'))
 	    {
 	      dirlen = strlen (dirname);
 	      temp = (char *)xmalloc (2 + dirlen + D_NAMLEN (entry));
